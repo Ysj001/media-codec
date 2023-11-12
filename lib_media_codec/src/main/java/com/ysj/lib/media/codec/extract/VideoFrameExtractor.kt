@@ -53,7 +53,11 @@ class VideoFrameExtractor private constructor(builder: Builder) {
 
     sealed interface Event {
 
-        data object Started : Event
+        data class Started(
+            val videoPath: String,
+            val resolution: Size,
+            val rangeUs: LongRange,
+        ) : Event
 
         data class FrameAvailable(
             val ptsNs: Long,

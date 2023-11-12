@@ -41,7 +41,7 @@ class VideoDecoder constructor(
 ) {
 
     companion object {
-        private const val TAG = "VideoDecode"
+        private const val TAG = "VideoDecoder"
     }
 
     private val executor = object : Executor {
@@ -173,7 +173,7 @@ class VideoDecoder constructor(
             this.codec = codec
             codec.start()
             executor.execute {
-                callback.onStarted()
+                callback.onStarted(relRangeUs, relSize)
             }
         }
 
@@ -302,7 +302,7 @@ class VideoDecoder constructor(
     }
 
     interface Callback {
-        fun onStarted()
+        fun onStarted(rangeUs: LongRange, resolution: Size)
         fun onFinalized(e: Throwable?)
         fun onFrameArrive(image: Bitmap, ptsNs: Long)
     }

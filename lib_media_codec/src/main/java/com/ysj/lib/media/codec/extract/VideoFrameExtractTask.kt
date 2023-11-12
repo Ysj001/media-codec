@@ -155,6 +155,7 @@ internal class VideoFrameExtractTask(
 
     // execute by executor
     private fun onFrameAvailable(image: Bitmap, ptsNs: Long) {
+        Log.i(TAG, "onFrameAvailable: $ptsNs")
         sendEvent(VideoFrameExtractor.Event.FrameAvailable(
             ptsNs = ptsNs,
             bitmap = image,
@@ -187,12 +188,16 @@ internal class VideoFrameExtractTask(
 
     private inner class VideoDecodeCallback : VideoDecoder.Callback {
 
-        override fun onStarted() = executor.execute {
+        override fun onStarted(rangeUs: LongRange, resolution: Size) = executor.execute {
             when (state) {
                 State.IDLE -> Unit
                 State.STARTING -> {
                     state = State.STARTED
-                    sendEvent(VideoFrameExtractor.Event.Started)
+                    sendEvent(VideoFrameExtractor.Event.Started(
+                        videoPath = videoPath,
+                        resolution = resolution,
+                        rangeUs = rangeUs,
+                    ))
                 }
                 State.STARTED -> throw IllegalStateException("was started.")
                 State.STOPPING -> Unit
