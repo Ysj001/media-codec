@@ -9,7 +9,6 @@ import android.opengl.EGL14
 import android.opengl.EGLSurface
 import android.opengl.GLES20
 import android.opengl.Matrix
-import android.os.Handler
 import android.util.Log
 import android.util.Size
 import android.view.Surface
@@ -62,6 +61,8 @@ class VideoDecoder constructor(
         }
     }
 
+    private val lock = DecodeLock()
+
     // =================== execute by executor ===================
 
     private var extractor: MediaExtractor? = null
@@ -80,8 +81,6 @@ class VideoDecoder constructor(
     private var surface: Surface? = null
 
     private var codec: MediaCodec? = null
-
-    private var frameDecoded = false
 
     private var pixelBuf: ByteBuffer? = null
 
@@ -168,14 +167,13 @@ class VideoDecoder constructor(
             this.surface = surface
             this.pixelBuf = pixelBuf
             val codec = MediaCodec.createDecoderByType(format.mime)
-            codec.setCallback(CodeCallback(glThread.handler, relRangeUs))
+            codec.setCallback(CodeCallback(relRangeUs))
             codec.configure(format, surface, null, 0)
             this.codec = codec
             codec.start()
-            executor.execute {
-                callback.onStarted(relRangeUs, relSize)
-            }
         }
+
+        callback.onStarted(relRangeUs, relSize)
 
         Log.d(TAG, "start.")
     }
@@ -189,11 +187,14 @@ class VideoDecoder constructor(
     }
 
     private fun reset() {
-        extractor?.runCatching {
-            release()
+        val extractor = this.extractor
+        if (extractor != null) {
+            extractor.runCatching {
+                release()
+            }
+            this.extractor = null
         }
-        extractor = null
-        frameDecoded = false
+        lock.setLock(false)
         glThread?.quit()
         glThread = null
         isSignalEnd = false
@@ -218,67 +219,67 @@ class VideoDecoder constructor(
     private inner class OnFrameListener(val width: Int, val height: Int) : SurfaceTexture.OnFrameAvailableListener {
 
         override fun onFrameAvailable(surfaceTexture: SurfaceTexture) {
-            surfaceTexture.updateTexImage()
-            val ptsNs = surfaceTexture.timestamp
-            val program = checkNotNull(glProgram)
-            val texture = checkNotNull(glTexture)
-            val pixelBuf = checkNotNull(pixelBuf)
-            program.texture = texture
-            program.run()
-            pixelBuf.rewind()
-            GLES20.glReadPixels(
-                0,
-                0,
-                width,
-                height,
-                GLES20.GL_RGBA,
-                GLES20.GL_UNSIGNED_BYTE,
-                pixelBuf
-            )
-            frameDecoded = false
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            bitmap.copyPixelsFromBuffer(pixelBuf)
-            executor.execute {
-                callback.onFrameArrive(bitmap, ptsNs)
+            try {
+                surfaceTexture.updateTexImage()
+                val ptsNs = surfaceTexture.timestamp
+                val program = checkNotNull(glProgram)
+                val texture = checkNotNull(glTexture)
+                val pixelBuf = checkNotNull(pixelBuf)
+                program.texture = texture
+                program.run()
+                pixelBuf.rewind()
+                GLES20.glReadPixels(
+                    0,
+                    0,
+                    width,
+                    height,
+                    GLES20.GL_RGBA,
+                    GLES20.GL_UNSIGNED_BYTE,
+                    pixelBuf
+                )
+                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                bitmap.copyPixelsFromBuffer(pixelBuf)
+                executor.execute {
+                    callback.onFrameArrive(bitmap, ptsNs)
+                }
+            } finally {
+                lock.setLock(false)
             }
         }
 
     }
 
-    private inner class CodeCallback(val handler: Handler, val rangeUs: LongRange) : MediaCodec.Callback() {
+    private inner class CodeCallback(val rangeUs: LongRange) : MediaCodec.Callback() {
 
-        override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {
+        override fun onInputBufferAvailable(codec: MediaCodec, index: Int) = executor.execute {
             if (isSignalEnd) {
                 codec.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                return
+                return@execute
             }
             val extractor = checkNotNull(extractor)
             if (extractor.sampleTime > rangeUs.last) {
                 codec.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                return
+                return@execute
             }
             val buffer = requireNotNull(codec.getInputBuffer(index))
             val size = extractor.readSampleData(buffer, 0)
             if (size > 0) {
-                codec.queueInputBuffer(index, 0, size, extractor.sampleTime, extractor.sampleFlags)
+                codec.queueInputBuffer(index, 0, size, extractor.sampleTime, 0)
                 extractor.advance()
-                return
+                return@execute
             }
             codec.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
         }
 
-        override fun onOutputBufferAvailable(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
+        override fun onOutputBufferAvailable(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) = executor.execute {
             if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM == 0 && info.presentationTimeUs < rangeUs.first) {
                 codec.releaseOutputBuffer(index, false)
-                return
+                return@execute
             }
             if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM == 0) {
-                if (frameDecoded) {
-                    handler.post { onOutputBufferAvailable(codec, index, info) }
-                    return
-                }
-                frameDecoded = true
+                lock.setLock(true)
                 codec.releaseOutputBuffer(index, info.presentationTimeUs * 1000)
+                lock.awaitFrame()
             } else {
                 codec.releaseOutputBuffer(index, false)
                 executor.execute {
@@ -299,6 +300,33 @@ class VideoDecoder constructor(
             Log.d(TAG, "output format. $format")
         }
 
+    }
+
+    @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+    private class DecodeLock : Object() {
+        private var waiting = false
+
+        @Synchronized
+        fun setLock(waiting: Boolean) {
+            this.waiting = waiting
+            if (!waiting) {
+                notifyAll()
+            }
+        }
+
+        @Synchronized
+        fun awaitFrame() {
+            if (!waiting) return
+            try {
+                wait(2500)
+                if (waiting) {
+                    throw RuntimeException("wait frame timeout!")
+                }
+            } catch (e: InterruptedException) {
+                Thread.interrupted()
+                return
+            }
+        }
     }
 
     interface Callback {
