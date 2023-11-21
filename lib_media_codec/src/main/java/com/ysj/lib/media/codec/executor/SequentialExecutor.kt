@@ -11,7 +11,7 @@ import java.util.concurrent.RejectedExecutionException
  * @author Ysj
  * Create time: 2023/6/9
  */
-internal class SequentialExecutor constructor(private val executor: Executor) : Executor {
+class SequentialExecutor constructor(private val executor: Executor) : Executor {
 
     private enum class WorkerState {
         IDLE,
