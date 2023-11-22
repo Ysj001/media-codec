@@ -119,7 +119,6 @@ class MediaDecoder(
             return
         }
         isSignalEnd = true
-        codec.flush()
         bufferInput.release()
         Log.d(TAG, "signalEndOfInputStream")
     }
