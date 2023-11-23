@@ -119,6 +119,11 @@ class MediaDecoder(
             return
         }
         isSignalEnd = true
+        val buffer = bufferInput.acquireBuffer()
+        if (buffer != null) {
+            buffer.setEndOfStream(true)
+            buffer.submit()
+        }
         bufferInput.release()
         Log.d(TAG, "signalEndOfInputStream")
     }
