@@ -41,17 +41,15 @@ class SurfaceInputEncoder(
     private var error: Throwable? = null
     private var isSignalEnd = false
 
-    init {
-        Log.d(TAG, "codec format: $format")
-        resetInternal()
-    }
-
     override fun start() = executor.execute {
         when (state) {
             State.IDLE -> {
+                codec.setCallback(CodecCallback())
+                codec.configure(format, output.surface(), null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                 codec.start()
                 state = State.STARTED
                 sendEvent(Codec.Event.Started)
+                Log.d(TAG, "start. $format")
             }
             State.PAUSED -> TODO("Not yet implemented")
             State.STARTED,
@@ -146,8 +144,6 @@ class SurfaceInputEncoder(
     // execute by execute
     private fun resetInternal() {
         codec.reset()
-        codec.setCallback(CodecCallback())
-        codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         surfaceInput.resetSurface()
         isSignalEnd = false
         error = null
@@ -187,7 +183,7 @@ class SurfaceInputEncoder(
                 codec.releaseOutputBuffer(index, false)
                 return@execute
             }
-            if (info.isEndOfStream) {
+            if (!info.isEndOfStream) {
                 if (info.size <= 0) {
                     Log.d(TAG, "Drop buffer by invalid buffer size.")
                     codec.releaseOutputBuffer(index, false)

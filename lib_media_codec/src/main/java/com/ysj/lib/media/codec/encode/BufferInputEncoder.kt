@@ -44,16 +44,15 @@ class BufferInputEncoder(
     private var error: Throwable? = null
     private var isSignalEnd = false
 
-    init {
-        resetInternal()
-    }
-
     override fun start() = executor.execute {
         when (state) {
             State.IDLE -> {
+                codec.setCallback(CodecCallback())
+                codec.configure(format, output.surface(), null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                 codec.start()
                 state = State.STARTED
                 sendEvent(Codec.Event.Started)
+                Log.d(TAG, "start. $format")
             }
             State.PAUSED -> TODO("Not yet implemented")
             State.STARTED,
@@ -141,16 +140,19 @@ class BufferInputEncoder(
             return
         }
         isSignalEnd = true
-        codec.flush()
+        val buffer = bufferInput.acquireBuffer()
+        if (buffer != null) {
+            buffer.setEndOfStream(true)
+            buffer.submit()
+        }
         bufferInput.release()
         Log.d(TAG, "signalEndOfInputStream")
     }
 
     // execute by execute
     private fun resetInternal() {
+        bufferInput.release()
         codec.reset()
-        codec.setCallback(CodecCallback())
-        codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         isSignalEnd = false
         error = null
         state = State.IDLE
@@ -195,7 +197,7 @@ class BufferInputEncoder(
                 codec.releaseOutputBuffer(index, false)
                 return@execute
             }
-            if (info.isEndOfStream) {
+            if (!info.isEndOfStream) {
                 if (info.size <= 0) {
                     Log.d(TAG, "Drop buffer by invalid buffer size.")
                     codec.releaseOutputBuffer(index, false)
