@@ -39,5 +39,4 @@ android {
 }
 
 dependencies {
-    implementation(project(":lib_egl"))
 }
