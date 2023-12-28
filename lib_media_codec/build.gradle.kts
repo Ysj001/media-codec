@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.github.ysj001.lib"
-version = "1.0.0"
+version = "1.0.0-beta"
 
 android {
     namespace = "com.ysj.lib.media.codec"
@@ -27,11 +27,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
     }
     buildFeatures {
         viewBinding = true
