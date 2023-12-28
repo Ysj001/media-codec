@@ -287,7 +287,7 @@ class MediaDecoder(
 
         override fun setPresentationTimeUs(presentationTimeUs: Long) {
             checkTerminated()
-            this.presentationTimeUs = max(0, presentationTimeUs)
+            this.presentationTimeUs = presentationTimeUs
         }
 
         override fun setEndOfStream(isEnd: Boolean) {

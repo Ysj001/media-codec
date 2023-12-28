@@ -46,6 +46,7 @@ class SurfaceInputEncoder(
             State.IDLE -> {
                 codec.setCallback(CodecCallback())
                 codec.configure(format, output.surface(), null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                surfaceInput.resetSurface()
                 codec.start()
                 state = State.STARTED
                 sendEvent(Codec.Event.Started)
@@ -142,16 +143,6 @@ class SurfaceInputEncoder(
     }
 
     // execute by execute
-    private fun resetInternal() {
-        codec.reset()
-        surfaceInput.resetSurface()
-        isSignalEnd = false
-        error = null
-        state = State.IDLE
-        Log.d(TAG, "resetInternal.")
-    }
-
-    // execute by execute
     private fun releaseInternal() {
         surfaceInput.release()
         codec.reset()
@@ -210,7 +201,7 @@ class SurfaceInputEncoder(
                         val data = OutputData(info, index, codec.getOutputBuffer(index)!!)
                         data.onBufferReleased = {
                             sendEvent(Codec.Event.Finalized(error))
-                            resetInternal()
+                            releaseInternal()
                         }
                         output.onCodecOutput(data)
                     }

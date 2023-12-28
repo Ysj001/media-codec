@@ -143,20 +143,11 @@ class BufferInputEncoder(
         val buffer = bufferInput.acquire()
         if (buffer != null) {
             buffer.setEndOfStream(true)
+            buffer.setPresentationTimeUs(-1)
             buffer.submit()
         }
         bufferInput.release()
         Log.d(TAG, "signalEndOfInputStream")
-    }
-
-    // execute by execute
-    private fun resetInternal() {
-        bufferInput.release()
-        codec.reset()
-        isSignalEnd = false
-        error = null
-        state = State.IDLE
-        Log.d(TAG, "resetInternal.")
     }
 
     // execute by execute
@@ -224,7 +215,7 @@ class BufferInputEncoder(
                         val data = OutputData(info, index, codec.getOutputBuffer(index)!!)
                         data.onBufferReleased = {
                             sendEvent(Codec.Event.Finalized(error))
-                            resetInternal()
+                            releaseInternal()
                         }
                         output.onCodecOutput(data)
                     }
@@ -309,7 +300,7 @@ class BufferInputEncoder(
 
         override fun setPresentationTimeUs(presentationTimeUs: Long) {
             checkTerminated()
-            this.presentationTimeUs = max(0, presentationTimeUs)
+            this.presentationTimeUs = presentationTimeUs
         }
 
         override fun setEndOfStream(isEnd: Boolean) {
