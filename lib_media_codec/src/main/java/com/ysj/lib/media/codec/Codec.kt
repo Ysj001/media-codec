@@ -3,7 +3,7 @@ package com.ysj.lib.media.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.view.Surface
-import com.ysj.lib.media.codec.Codec.BufferInput.Buffer
+import com.ysj.lib.media.codec.Codec.BufferInput.Data
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.util.concurrent.CancellationException
@@ -103,19 +103,19 @@ interface Codec<I : Codec.Input> {
     }
 
     /**
-     * 定义以 [Buffer] 作为输入的 [Input]。
+     * 定义以 [Data] 作为输入的 [Input]。
      */
     interface BufferInput : Input {
 
         /**
-         * 调用该方法获取一个用于给 [Codec] 提供输入数据的 [InputBuffer]。
+         * 调用该方法获取一个 [Codec] 的输入数据。
          */
-        fun acquireBuffer(): Buffer?
+        fun acquire(): Data?
 
         /**
          * 定义作为 [Codec] 输入数据的缓存。
          */
-        interface Buffer {
+        interface Data {
 
             /**
              * 获取一个 [ByteBuffer]。

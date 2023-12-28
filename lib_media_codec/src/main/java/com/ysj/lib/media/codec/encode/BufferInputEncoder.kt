@@ -140,7 +140,7 @@ class BufferInputEncoder(
             return
         }
         isSignalEnd = true
-        val buffer = bufferInput.acquireBuffer()
+        val buffer = bufferInput.acquire()
         if (buffer != null) {
             buffer.setEndOfStream(true)
             buffer.submit()
@@ -257,14 +257,14 @@ class BufferInputEncoder(
 
         private val lock = ReentrantLock()
 
-        override fun acquireBuffer(): Codec.BufferInput.Buffer? {
+        override fun acquire(): Codec.BufferInput.Data? {
             lock.lock()
             val bufferIndex = freeBufferIndexQueue.poll()
             if (bufferIndex == null) {
                 lock.unlock()
                 return null
             }
-            return object : InputBuffer(bufferIndex) {
+            return object : InputData(bufferIndex) {
                 override fun submit(): Boolean {
                     val submit = super.submit()
                     lock.unlock()
@@ -292,7 +292,7 @@ class BufferInputEncoder(
         }
     }
 
-    private open inner class InputBuffer(val bufferIndex: Int) : Codec.BufferInput.Buffer {
+    private open inner class InputData(val bufferIndex: Int) : Codec.BufferInput.Data {
 
         private val terminated = AtomicBoolean(false)
 
