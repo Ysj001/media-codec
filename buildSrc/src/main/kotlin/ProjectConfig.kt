@@ -29,9 +29,15 @@ fun Project.projectConfigure() = afterEvaluate config@{
     when (androidExt) {
         is LibraryAndroidComponentsExtension -> {
             // android library
+            dependencies.applyKotlin()
+            dependencies.applyAndroidTest()
         }
         is ApplicationAndroidComponentsExtension -> {
             // android application
+            dependencies.applyKotlin()
+            dependencies.applyAndroidTest()
+            dependencies.applyAndroidCommon()
+            dependencies.applyAndroidKtx()
         }
         else -> return@config
     }
@@ -39,8 +45,4 @@ fun Project.projectConfigure() = afterEvaluate config@{
         // changing modules 如：SNAPSHOT 只缓存 40s
         resolutionStrategy.cacheChangingModulesFor(40, TimeUnit.SECONDS)
     }
-    dependencies.applyKotlin()
-    dependencies.applyAndroidTest()
-    dependencies.applyAndroidCommon()
-    dependencies.applyAndroidKtx()
 }
