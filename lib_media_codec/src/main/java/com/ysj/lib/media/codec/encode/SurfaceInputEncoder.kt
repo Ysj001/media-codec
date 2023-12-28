@@ -199,7 +199,7 @@ class SurfaceInputEncoder(
                     return@execute
                 }
                 lastPresentationTimeUs = info.presentationTimeUs
-                output.onCodecOutput(OutputBuffer(info, index, codec.getOutputBuffer(index)!!))
+                output.onCodecOutput(OutputData(info, index, codec.getOutputBuffer(index)!!))
             } else {
                 hasEndData = true
                 when (state) {
@@ -207,20 +207,20 @@ class SurfaceInputEncoder(
                     State.STARTED,
                     State.PAUSED,
                     State.STOPPING -> {
-                        val buffer = OutputBuffer(info, index, codec.getOutputBuffer(index)!!)
-                        buffer.onBufferReleased = {
+                        val data = OutputData(info, index, codec.getOutputBuffer(index)!!)
+                        data.onBufferReleased = {
                             sendEvent(Codec.Event.Finalized(error))
                             resetInternal()
                         }
-                        output.onCodecOutput(buffer)
+                        output.onCodecOutput(data)
                     }
                     State.RELEASING -> {
-                        val buffer = OutputBuffer(info, index, codec.getOutputBuffer(index)!!)
-                        buffer.onBufferReleased = {
+                        val data = OutputData(info, index, codec.getOutputBuffer(index)!!)
+                        data.onBufferReleased = {
                             sendEvent(Codec.Event.Finalized(error))
                             releaseInternal()
                         }
-                        output.onCodecOutput(buffer)
+                        output.onCodecOutput(data)
                     }
                     State.RELEASED -> throw IllegalStateException("encoder was released.")
                 }
@@ -256,11 +256,11 @@ class SurfaceInputEncoder(
         }
     }
 
-    private inner class OutputBuffer(
+    private inner class OutputData(
         val bufferInfo: MediaCodec.BufferInfo,
         val bufferIndex: Int,
         val buffer: ByteBuffer,
-    ) : Codec.Output.Buffer {
+    ) : Codec.Output.Data {
 
         var onBufferReleased: (() -> Unit)? = null
 

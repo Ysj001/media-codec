@@ -170,14 +170,14 @@ interface Codec<I : Codec.Input> {
         fun isReleased(): Boolean
 
         /**
-         * [Codec] 内部会调用该方法返回一个处理好的 [Buffer]。
+         * [Codec] 内部会调用该方法返回一个处理好的 [Data]。
          */
-        fun onCodecOutput(buffer: Buffer)
+        fun onCodecOutput(data: Data)
 
         /**
-         * 定义 [Codec] 输出缓存。
+         * 定义 [Codec.Output] 输出的数据。
          */
-        interface Buffer : Closeable {
+        interface Data : Closeable {
 
             fun buffer(): ByteBuffer
 
